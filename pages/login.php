@@ -22,6 +22,13 @@ if (isLoggedIn()) {
 $errors = [];
 $email  = '';
 
+// Safe internal redirect after login (e.g. from trainer profile page)
+$redirect = trim($_GET['redirect'] ?? $_POST['redirect'] ?? '');
+// Only allow redirects within this app — must start with BASE_URL
+if ($redirect && strpos($redirect, BASE_URL . '/') !== 0) {
+    $redirect = '';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email']    ?? '');
     $password =      $_POST['password'] ?? '';
@@ -46,7 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_role']        = $user['role'];
             $_SESSION['user_is_approved'] = (bool) $user['is_approved'];
 
-            header('Location: ' . BASE_URL . '/pages/dashboard.php');
+            $destination = $redirect ?: BASE_URL . '/pages/dashboard.php';
+            header('Location: ' . $destination);
             exit;
         }
     }
@@ -58,6 +66,11 @@ require_once __DIR__ . '/../includes/header.php';
 
 <!-- ── Left brand panel ────────────────────────────────────── -->
 <div class="auth-panel-left">
+
+    <a href="<?= BASE_URL ?>/" class="auth-back-home">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Home
+    </a>
 
     <div class="auth-brand">Fit<span>Trainer</span></div>
 
@@ -97,6 +110,9 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
 
         <form method="POST" action="">
+            <?php if ($redirect): ?>
+                <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
+            <?php endif; ?>
 
             <div class="mb-3">
                 <label for="email" class="form-label">Email address</label>

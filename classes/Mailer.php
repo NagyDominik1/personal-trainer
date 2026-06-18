@@ -61,6 +61,113 @@ class Mailer
         return self::send($toEmail, $toName, $subject, $body);
     }
 
+    public static function sendTrainerApproved(string $toEmail, string $toName): bool
+    {
+        $link = APP_URL . '/pages/trainer/workouts.php';
+        return self::send($toEmail, $toName, 'Your trainer account has been approved!',
+            self::wrap('You\'re Approved!', "
+                <p style='margin:0 0 18px'>Hi <strong>{$toName}</strong>,</p>
+                <p style='margin:0 0 18px'>Great news — an admin has approved your trainer account on <strong>Personal Trainer App</strong>. You can now create and publish workout programs for your clients.</p>
+                " . self::btn($link, 'Go to My Workouts', '#2d6a4f') . "
+                <p style='margin:18px 0 0;color:#999;font-size:13px'>If you have any questions, contact the admin team.</p>
+            ")
+        );
+    }
+
+    public static function sendTrainerRejected(string $toEmail, string $toName): bool
+    {
+        return self::send($toEmail, $toName, 'Update on your trainer application',
+            self::wrap('Application Not Approved', "
+                <p style='margin:0 0 18px'>Hi <strong>{$toName}</strong>,</p>
+                <p style='margin:0 0 18px'>Unfortunately your trainer account application on <strong>Personal Trainer App</strong> was not approved at this time. Your account has been removed.</p>
+                <p style='margin:0;color:#999;font-size:13px'>If you believe this was a mistake, please re-register or contact the admin team.</p>
+            ")
+        );
+    }
+
+    public static function sendNewWorkout(string $toEmail, string $toName, string $trainerName, string $workoutTitle, int $workoutId): bool
+    {
+        $link = APP_URL . '/pages/user/workouts.php?id=' . $workoutId;
+        return self::send($toEmail, $toName, "{$trainerName} just published a new workout",
+            self::wrap('New Program Available', "
+                <p style='margin:0 0 18px'>Hi <strong>{$toName}</strong>,</p>
+                <p style='margin:0 0 18px'><strong>{$trainerName}</strong>, a trainer you follow, just published a new workout program:</p>
+                <div style='background:#f8f4f0;border-left:4px solid #8b5a2b;border-radius:6px;padding:14px 18px;margin:0 0 22px'>
+                    <div style='font-size:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#3a1f0a'>{$workoutTitle}</div>
+                </div>
+                " . self::btn($link, 'View Program') . "
+            ")
+        );
+    }
+
+    public static function sendReviewReceived(string $toEmail, string $toName, string $reviewerName, string $workoutTitle, int $rating, string $comment): bool
+    {
+        $stars = str_repeat('★', $rating) . str_repeat('☆', 5 - $rating);
+        $commentHtml = $comment
+            ? "<p style='margin:14px 0 0;font-style:italic;color:#555;font-size:14px'>\"{$comment}\"</p>"
+            : '';
+        return self::send($toEmail, $toName, "New review on \"{$workoutTitle}\"",
+            self::wrap('You Got a Review', "
+                <p style='margin:0 0 18px'>Hi <strong>{$toName}</strong>,</p>
+                <p style='margin:0 0 18px'><strong>{$reviewerName}</strong> left a review on your workout:</p>
+                <div style='background:#f8f4f0;border-left:4px solid #8b5a2b;border-radius:6px;padding:14px 18px;margin:0 0 22px'>
+                    <div style='font-size:14px;font-weight:600;color:#555;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px'>{$workoutTitle}</div>
+                    <div style='font-size:22px;color:#c9952a;letter-spacing:2px'>{$stars}</div>
+                    {$commentHtml}
+                </div>
+            ")
+        );
+    }
+
+    public static function sendCoachRequest(string $toEmail, string $toName, string $clientName, string $message): bool
+    {
+        $link = APP_URL . '/pages/trainer/clients.php';
+        $msgHtml = $message
+            ? "<div style='background:#f8f4f0;border-left:4px solid #8b5a2b;border-radius:6px;padding:14px 18px;margin:0 0 22px;font-style:italic;color:#555'>\"" . htmlspecialchars($message) . "\"</div>"
+            : '';
+        return self::send($toEmail, $toName, "{$clientName} wants you as their coach",
+            self::wrap('New Coaching Request', "
+                <p style='margin:0 0 18px'>Hi <strong>{$toName}</strong>,</p>
+                <p style='margin:0 0 18px'><strong>" . htmlspecialchars($clientName) . "</strong> has requested you as their personal coach.</p>
+                {$msgHtml}
+                " . self::btn($link, 'Review Request') . "
+            ")
+        );
+    }
+
+    public static function sendCoachAccepted(string $toEmail, string $toName, string $trainerName): bool
+    {
+        $link = APP_URL . '/pages/user/my_plan.php';
+        return self::send($toEmail, $toName, "{$trainerName} accepted you as a client",
+            self::wrap('You Have a Coach!', "
+                <p style='margin:0 0 18px'>Hi <strong>{$toName}</strong>,</p>
+                <p style='margin:0 0 18px'><strong>" . htmlspecialchars($trainerName) . "</strong> accepted your coaching request. They can now help build and refine your personal plans.</p>
+                " . self::btn($link, 'View My Plans', '#2d6a4f') . "
+            ")
+        );
+    }
+
+    private static function wrap(string $title, string $content): string
+    {
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>
+        <body style='margin:0;padding:0;background:#f5f0eb;font-family:Arial,sans-serif'>
+        <div style='max-width:560px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)'>
+            <div style='background:linear-gradient(135deg,#8b5a2b,#5c3210);padding:28px 36px'>
+                <div style='color:#d4a96a;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px'>FitTrainer</div>
+                <div style='color:#fff;font-size:22px;font-weight:700;letter-spacing:.5px'>{$title}</div>
+            </div>
+            <div style='padding:32px 36px;font-size:15px;color:#333;line-height:1.6'>{$content}</div>
+            <div style='padding:16px 36px;background:#f8f4f0;border-top:1px solid #ede8e2;font-size:12px;color:#aaa'>
+                Personal Trainer App &mdash; You received this because you have an account with us.
+            </div>
+        </div></body></html>";
+    }
+
+    private static function btn(string $url, string $label, string $color = '#8b5a2b'): string
+    {
+        return "<p style='margin:22px 0 0'><a href='{$url}' style='background:{$color};color:#fff;padding:12px 26px;text-decoration:none;border-radius:7px;display:inline-block;font-weight:700;font-size:14px;letter-spacing:.5px'>{$label}</a></p>";
+    }
+
     // Core send method — used by all public methods above
     private static function send(string $toEmail, string $toName, string $subject, string $body): bool
     {

@@ -36,6 +36,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 </head>
 
 <?php if (isLoggedIn()):
+    // ── App layout (sidebar) ─────────────────────────────
     // Build two-letter initials for the sidebar avatar
     $nameParts = explode(' ', $_SESSION['user_name'] ?? '');
     $initials  = strtoupper(
@@ -44,6 +45,25 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     );
     $role       = $_SESSION['user_role']        ?? 'user';
     $isApproved = $_SESSION['user_is_approved'] ?? false;
+
+    // Pending coaching requests badge (trainers only).
+    $coachPending = 0;
+    if ($role === 'trainer' && class_exists('Database')) {
+        try {
+            $cstmt = Database::getInstance()->prepare('SELECT COUNT(*) FROM coaching WHERE trainer_id = :tid AND status = "pending"');
+            $cstmt->execute([':tid' => (int)($_SESSION['user_id'] ?? 0)]);
+            $coachPending = (int) $cstmt->fetchColumn();
+        } catch (Throwable $e) { /* table may not exist yet */ }
+    }
+
+    // Unread support messages badge (admin only).
+    $supportUnread = 0;
+    if ($role === 'admin' && class_exists('Database')) {
+        try {
+            $supportUnread = (int) Database::getInstance()
+                ->query('SELECT COUNT(*) FROM support_messages WHERE is_read = 0')->fetchColumn();
+        } catch (Throwable $e) { /* table may not exist yet */ }
+    }
 ?>
 
 <body class="app-layout <?= htmlspecialchars($bodyClass ?? '') ?>">
@@ -78,6 +98,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
             <div class="sidebar-section">Admin Panel</div>
 
+            <a href="<?= BASE_URL ?>/pages/admin/dashboard.php"
+               class="sidebar-link<?= $currentPage === 'dashboard.php' && strpos($_SERVER['PHP_SELF'], 'admin') !== false ? ' active' : '' ?>">
+                <i class="bi bi-bar-chart-line"></i>
+                <span>Stats</span>
+            </a>
+
             <a href="<?= BASE_URL ?>/pages/admin/index.php"
                class="sidebar-link<?= $currentPage === 'index.php' ? ' active' : '' ?>">
                 <i class="bi bi-tags"></i>
@@ -94,6 +120,27 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                class="sidebar-link<?= $currentPage === 'users.php' ? ' active' : '' ?>">
                 <i class="bi bi-people"></i>
                 <span>Users</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>/pages/admin/workouts.php"
+               class="sidebar-link<?= $currentPage === 'workouts.php' && strpos($_SERVER['PHP_SELF'], 'admin') !== false ? ' active' : '' ?>">
+                <i class="bi bi-shield-check"></i>
+                <span>Moderation</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>/pages/admin/coaching.php"
+               class="sidebar-link<?= $currentPage === 'coaching.php' ? ' active' : '' ?>">
+                <i class="bi bi-link-45deg"></i>
+                <span>Coaching</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>/pages/admin/support.php"
+               class="sidebar-link<?= $currentPage === 'support.php' && strpos($_SERVER['PHP_SELF'], 'admin') !== false ? ' active' : '' ?>">
+                <i class="bi bi-chat-left-dots"></i>
+                <span>Support</span>
+                <?php if ($supportUnread > 0): ?>
+                    <span style="margin-left:auto;background:oklch(58% 0.14 42);color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.66rem;line-height:1;padding:3px 7px;border-radius:9px"><?= $supportUnread ?></span>
+                <?php endif; ?>
             </a>
 
         <?php elseif ($role === 'trainer'): ?>
@@ -115,6 +162,23 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 <span>My Workouts</span>
             </a>
 
+            <a href="<?= BASE_URL ?>/pages/trainer/clients.php"
+               class="sidebar-link<?= $currentPage === 'clients.php' ? ' active' : '' ?>
+                      <?= !$isApproved ? ' sidebar-link--muted' : '' ?>">
+                <i class="bi bi-people"></i>
+                <span>Clients</span>
+                <?php if ($coachPending > 0): ?>
+                    <span style="margin-left:auto;background:oklch(58% 0.14 42);color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.66rem;line-height:1;padding:3px 7px;border-radius:9px"><?= $coachPending ?></span>
+                <?php endif; ?>
+            </a>
+
+            <a href="<?= BASE_URL ?>/pages/trainer/analytics.php"
+               class="sidebar-link<?= $currentPage === 'analytics.php' ? ' active' : '' ?>
+                      <?= !$isApproved ? ' sidebar-link--muted' : '' ?>">
+                <i class="bi bi-bar-chart-line"></i>
+                <span>Analytics</span>
+            </a>
+
         <?php else: ?>
 
             <div class="sidebar-section">Workouts</div>
@@ -129,6 +193,26 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                class="sidebar-link<?= $currentPage === 'saved.php' ? ' active' : '' ?>">
                 <i class="bi bi-bookmark-star"></i>
                 <span>Saved</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>/pages/user/my_plan.php"
+               class="sidebar-link<?= $currentPage === 'my_plan.php' ? ' active' : '' ?>">
+                <i class="bi bi-journal-plus"></i>
+                <span>My Plans</span>
+            </a>
+
+            <div class="sidebar-section">Community</div>
+
+            <a href="<?= BASE_URL ?>/pages/trainers.php"
+               class="sidebar-link<?= $currentPage === 'trainers.php' ? ' active' : '' ?>">
+                <i class="bi bi-people"></i>
+                <span>Trainers</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>/pages/user/support.php"
+               class="sidebar-link<?= $currentPage === 'support.php' ? ' active' : '' ?>">
+                <i class="bi bi-chat-left-dots"></i>
+                <span>Support</span>
             </a>
 
         <?php endif; ?>
@@ -181,6 +265,25 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <!-- Page content -->
     <main class="main-content">
         <div id="alert-container"></div>
+
+<?php elseif ($isPublicPage ?? false): ?>
+
+<!-- ════════════════════════════════════════════════════════════
+     PUBLIC PAGE LAYOUT  (guest views a public page, e.g. trainer profile)
+     ════════════════════════════════════════════════════════════ -->
+<body class="public-layout">
+
+<!-- Sticky nav -->
+<nav class="pub-nav">
+    <a href="<?= BASE_URL ?>/" class="pub-nav-brand">Fit<span>Trainer</span></a>
+    <div class="pub-nav-right">
+        <a href="<?= BASE_URL ?>/pages/login.php"    class="pub-nav-link">Sign in</a>
+        <a href="<?= BASE_URL ?>/pages/register.php" class="pub-nav-btn">Get started</a>
+    </div>
+</nav>
+
+<!-- Page content with clay-court background, offset for the fixed nav -->
+<div class="pub-page-bg">
 
 <?php else: ?>
 

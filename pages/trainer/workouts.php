@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/db_config.php';
 require_once __DIR__ . '/../../classes/Database.php';
 require_once __DIR__ . '/../../classes/Exercise.php';
 require_once __DIR__ . '/../../classes/Workout.php';
+require_once __DIR__ . '/../../classes/Mailer.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -22,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'category_id' => $_POST['category_id'],
             'title'       => trim($_POST['title']),
             'description' => trim($_POST['description']),
+            'difficulty'  => $_POST['difficulty'] ?: null,
         ]);
         if ($id) {
             header('Location: ' . BASE_URL . '/pages/trainer/workouts.php?id=' . $id);
@@ -59,6 +61,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . BASE_URL . '/pages/trainer/workouts.php?id=' . $wid);
         exit;
 
+    } elseif ($action === 'toggle_publish') {
+        $wid     = (int)$_POST['workout_id'];
+        $current = $workout->getById($wid);
+        $workout->togglePublish($wid, $userId);
+
+        // Only notify when going from draft → published
+        if ($current && $current['user_id'] === $userId && !$current['is_published']) {
+            $trainerName = $_SESSION['user_name'] ?? 'Your trainer';
+            $interested  = $db->prepare('
+                SELECT DISTINCT u.email, u.first_name, u.last_name
+                FROM user_workouts uw
+                JOIN workouts w ON uw.workout_id = w.id
+                JOIN users u ON uw.user_id = u.id
+                WHERE w.user_id = :tid AND uw.user_id != :tid
+            ');
+            $interested->execute([':tid' => $userId]);
+            foreach ($interested->fetchAll() as $u) {
+                Mailer::sendNewWorkout(
+                    $u['email'],
+                    $u['first_name'] . ' ' . $u['last_name'],
+                    $trainerName,
+                    $current['title'],
+                    $wid
+                );
+            }
+        }
+        header('Location: ' . BASE_URL . '/pages/trainer/workouts.php');
+        exit;
+
     } elseif ($action === 'edit_workout') {
         $wid = (int)$_POST['workout_id'];
         $workout->update($wid, [
@@ -66,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'category_id' => $_POST['category_id'] ?: null,
             'title'       => trim($_POST['title']),
             'description' => trim($_POST['description']),
+            'difficulty'  => $_POST['difficulty'] ?: null,
         ]);
         header('Location: ' . BASE_URL . '/pages/trainer/workouts.php?id=' . $wid);
         exit;
@@ -101,8 +133,18 @@ $topBarTitle = date('l, j F');
 $bodyClass   = 'photo-bg bg-clay';
 
 // Stats for the cards
-$totalPrograms   = count($workouts);
-$totalCategories = count(array_unique(array_filter(array_column($workouts, 'category_id'))));
+$totalPrograms = count($workouts);
+$totalPublished = count(array_filter($workouts, fn($w) => $w['is_published']));
+$totalDraft     = $totalPrograms - $totalPublished;
+
+if (!function_exists('difficultyLabel')) {
+    function difficultyLabel(?string $d): string {
+        return match($d) { 'beginner' => 'Beginner', 'intermediate' => 'Intermediate', 'advanced' => 'Advanced', default => '' };
+    }
+    function difficultyColor(?string $d): string {
+        return match($d) { 'beginner' => 'oklch(44% 0.12 152)', 'intermediate' => 'oklch(52% 0.13 88)', 'advanced' => 'oklch(50% 0.15 20)', default => '' };
+    }
+}
 
 if (!function_exists('wkCatColor')) {
     function wkCatColor(string $name): string {
@@ -741,18 +783,18 @@ require_once __DIR__ . '/../../includes/header.php';
         </button>
     </div>
 
-    <!-- Stat card: Total Programs -->
+    <!-- Stat card: Published -->
     <div class="stat-card stat-card--a pop" style="animation-delay:120ms">
+        <div class="stat-card-label">Published</div>
+        <div class="stat-card-value" data-count="<?= $totalPublished ?>">0</div>
+        <div class="stat-card-sub"><?= $totalDraft ?> draft<?= $totalDraft != 1 ? 's' : '' ?> not yet visible</div>
+    </div>
+
+    <!-- Stat card: Total -->
+    <div class="stat-card stat-card--b pop" style="animation-delay:220ms">
         <div class="stat-card-label">Total Programs</div>
         <div class="stat-card-value" data-count="<?= $totalPrograms ?>">0</div>
         <div class="stat-card-sub">workout programs created</div>
-    </div>
-
-    <!-- Stat card: Categories -->
-    <div class="stat-card stat-card--b pop" style="animation-delay:220ms">
-        <div class="stat-card-label">Categories</div>
-        <div class="stat-card-value" data-count="<?= $totalCategories ?>">0</div>
-        <div class="stat-card-sub">different training types</div>
     </div>
 
 </div>
@@ -780,14 +822,39 @@ require_once __DIR__ . '/../../includes/header.php';
                         <?= htmlspecialchars($w['category_name']) ?>
                     </span>
                 <?php endif; ?>
-                <span class="wk-row-date"><?= date('d M Y', strtotime($w['created_at'])) ?></span>
-                <?php if ($w['description']): ?>
-                    <span class="wk-row-desc"><?= htmlspecialchars($w['description']) ?></span>
+                <?php if ($w['difficulty']): ?>
+                    <span class="wk-cat-badge" style="background:<?= difficultyColor($w['difficulty']) ?>">
+                        <?= difficultyLabel($w['difficulty']) ?>
+                    </span>
+                <?php endif; ?>
+                <?php if ($w['day_count'] > 0): ?>
+                    <span class="wk-row-date"><?= $w['day_count'] ?> day<?= $w['day_count'] != 1 ? 's' : '' ?> &middot; <?= $w['exercise_count'] ?> exercise<?= $w['exercise_count'] != 1 ? 's' : '' ?></span>
+                <?php endif; ?>
+                <?php if ($w['save_count'] > 0): ?>
+                    <span class="wk-row-date" style="color:oklch(52% 0.13 88)">&#9733; <?= $w['save_count'] ?> saved</span>
                 <?php endif; ?>
             </div>
         </div>
 
+        <!-- Publish status badge (always visible) -->
+        <?php if ($w['is_published']): ?>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.69rem;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:5px;background:oklch(44% 0.12 152 / 0.12);color:oklch(38% 0.10 152);border:1px solid oklch(44% 0.12 152 / 0.3);flex-shrink:0">
+                &#10003; Published
+            </span>
+        <?php else: ?>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.69rem;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:5px;background:rgba(0,0,0,.06);color:oklch(50% 0.03 50);border:1px solid rgba(0,0,0,.1);flex-shrink:0">
+                Draft
+            </span>
+        <?php endif; ?>
+
         <div class="wk-row-actions">
+            <form method="POST" class="d-inline">
+                <input type="hidden" name="action" value="toggle_publish">
+                <input type="hidden" name="workout_id" value="<?= $w['id'] ?>">
+                <button type="submit" class="wk-btn-manage" style="<?= $w['is_published'] ? 'border-color:oklch(44% 0.12 152 / 0.4);color:oklch(38% 0.10 152)' : '' ?>">
+                    <?= $w['is_published'] ? 'Unpublish' : 'Publish' ?>
+                </button>
+            </form>
             <a href="?id=<?= $w['id'] ?>" class="wk-btn-manage">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 Manage
@@ -850,6 +917,16 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php foreach ($categories as $cat): ?>
                     <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-lbl">Difficulty</label>
+            <select name="difficulty" class="drawer-select">
+                <option value="">— unspecified —</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
             </select>
         </div>
 
@@ -972,6 +1049,16 @@ function confirmDelete(btn) {
                         <?= htmlspecialchars($cat['name']) ?>
                     </option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-lbl">Difficulty</label>
+            <select name="difficulty" class="drawer-select">
+                <option value="">— unspecified —</option>
+                <option value="beginner"     <?= ($detail['difficulty'] ?? '') === 'beginner'     ? 'selected' : '' ?>>Beginner</option>
+                <option value="intermediate" <?= ($detail['difficulty'] ?? '') === 'intermediate' ? 'selected' : '' ?>>Intermediate</option>
+                <option value="advanced"     <?= ($detail['difficulty'] ?? '') === 'advanced'     ? 'selected' : '' ?>>Advanced</option>
             </select>
         </div>
 

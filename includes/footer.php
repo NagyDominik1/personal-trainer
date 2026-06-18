@@ -14,6 +14,19 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 
     </div><!-- /.main-wrapper -->
 
+<?php elseif ($isPublicPage ?? false): ?>
+
+</div><!-- /.pub-page-bg -->
+
+<footer class="pub-footer">
+    &copy; <?= date('Y') ?> FitTrainer &nbsp;·&nbsp;
+    <a href="<?= BASE_URL ?>/pages/login.php"
+       style="color:rgba(255,255,255,0.45);text-decoration:none">Sign in</a>
+    &nbsp;·&nbsp;
+    <a href="<?= BASE_URL ?>/pages/register.php"
+       style="color:rgba(255,255,255,0.45);text-decoration:none">Register</a>
+</footer>
+
 <?php endif; ?>
 
 <!-- Bootstrap JS bundle (includes Popper) -->

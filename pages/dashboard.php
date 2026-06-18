@@ -47,7 +47,9 @@ require_once __DIR__ . '/../includes/header.php';
 <p class="section-label">Overview</p>
 <div class="stats-grid" id="stats-row">
 
-    <?php if ($role === 'admin'): ?>
+    <?php if ($role === 'admin'):
+        $publishedCount = Database::getInstance()->query('SELECT COUNT(*) FROM workouts WHERE is_published = 1 AND is_hidden = 0')->fetchColumn();
+    ?>
 
         <div class="stat-card stat-card--warning pop" style="animation-delay:120ms">
             <p class="stat-label">Pending Approvals</p>
@@ -59,10 +61,15 @@ require_once __DIR__ . '/../includes/header.php';
             <p class="stat-value" id="stat-banned-users">—</p>
             <p class="stat-sub">accounts currently suspended</p>
         </div>
-        <div class="stat-card stat-card--dark pop" style="grid-column: 1 / -1; max-width: calc(50% - 8px); animation-delay:280ms">
+        <div class="stat-card stat-card--dark pop" style="animation-delay:280ms">
             <p class="stat-label">Total Members</p>
             <p class="stat-value" id="stat-total-users">—</p>
             <p class="stat-sub">registered users &amp; trainers</p>
+        </div>
+        <div class="stat-card stat-card--ivy pop" style="animation-delay:360ms">
+            <p class="stat-label">Published Workouts</p>
+            <p class="stat-value"><?= $publishedCount ?></p>
+            <p class="stat-sub">live programs available to users</p>
         </div>
 
     <?php elseif ($role === 'trainer'): ?>
@@ -195,9 +202,29 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="editorial-arrow"><i class="bi bi-chevron-right"></i></div>
         </a>
-        <a href="<?= BASE_URL ?>/pages/profile.php" class="editorial-row rise" style="animation-delay:480ms">
+        <a href="<?= BASE_URL ?>/pages/user/my_plan.php" class="editorial-row rise" style="animation-delay:480ms">
             <span class="editorial-num">03</span>
             <span class="editorial-watermark">03</span>
+            <div class="editorial-icon"><i class="bi bi-journal-plus"></i></div>
+            <div class="editorial-body">
+                <span class="editorial-title">My Plans</span>
+                <span class="editorial-desc">Build a personal workout plan from exercises</span>
+            </div>
+            <div class="editorial-arrow"><i class="bi bi-chevron-right"></i></div>
+        </a>
+        <a href="<?= BASE_URL ?>/pages/trainers.php" class="editorial-row rise" style="animation-delay:560ms">
+            <span class="editorial-num">04</span>
+            <span class="editorial-watermark">04</span>
+            <div class="editorial-icon"><i class="bi bi-people"></i></div>
+            <div class="editorial-body">
+                <span class="editorial-title">Our Trainers</span>
+                <span class="editorial-desc">Browse trainer profiles and their programs</span>
+            </div>
+            <div class="editorial-arrow"><i class="bi bi-chevron-right"></i></div>
+        </a>
+        <a href="<?= BASE_URL ?>/pages/profile.php" class="editorial-row rise" style="animation-delay:640ms">
+            <span class="editorial-num">05</span>
+            <span class="editorial-watermark">05</span>
             <div class="editorial-icon"><i class="bi bi-person-circle"></i></div>
             <div class="editorial-body">
                 <span class="editorial-title">Edit Profile</span>

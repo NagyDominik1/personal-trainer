@@ -109,6 +109,11 @@ require_once __DIR__ . '/../includes/header.php';
 <!-- ── Left brand panel ────────────────────────────────────── -->
 <div class="auth-panel-left">
 
+    <a href="<?= BASE_URL ?>/" class="auth-back-home">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Home
+    </a>
+
     <div class="auth-brand">Fit<span>Trainer</span></div>
 
     <div class="auth-panel-body">
